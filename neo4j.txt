@@ -1,0 +1,63 @@
+Loading the movie database
+
+LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/MulukenMegersa/data-Semantics-project/main/Movie.csv' AS row
+MERGE (m:Movie {id: toInteger(row.movieId)})
+SET
+    m.movieId = row.movieId,
+    m.title = row.title,
+    m.budget = toFloat(row.budget),
+    m.countries = split(row.countries, '|'),
+    m.movie_imdbId = toInteger(row.movie_imdbId),
+    m.imdbRating = toFloat(row.imdbRating),
+    m.imdbVotes = toInteger(row.imdbVotes),
+    m.languages = split(row.languages, '|'),
+    m.plot = row.plot,
+    m.movie_poster = row.movie_poster,
+    m.released = row.released,
+    m.revenue = toFloat(row.revenue),
+    m.runtime = toInteger(row.runtime),
+    m.movie_tmdbId = toInteger(row.movie_tmdbId),
+    m.movie_url = row.movie_url,
+    m.year = toInteger(row.year),
+    m.genres = split(row.genres, '|')
+RETURN
+  m.title AS title,
+  m.movie_imdbId AS imdbId,
+  m.languages AS languages,
+  m.genres AS genres
+LIMIT 5
+
+
+MATCH (m:Movie {title: "Toy Story"})
+RETURN m.title AS title, m.plot AS plot, m.plotEmbedding
+
+LOAD CSV WITH HEADERS
+FROM 'https://data.neo4j.com/llm-fundamentals/openai-embeddings.csv'
+AS row
+MATCH (m:Movie {movieId: row.movieId})
+CALL db.create.setNodeVectorProperty(m, 'plotEmbedding', apoc.convert.fromJsonList(row.embedding))
+RETURN count(*)
+
+Creating index
+CREATE VECTOR INDEX moviePlots IF NOT EXISTS
+FOR (m:Movie)
+ON m.plotEmbedding
+OPTIONS {indexConfig: {
+ `vector.dimensions`: 3072,
+ `vector.similarity_function`: 'cosine'
+}}
+
+dbms.security.procedures.unrestricted=apoc.meta.*
+
+Delete all table data
+
+MATCH (n)
+DETACH DELETE n;
+
+
+LOAD CSV WITH HEADERS
+FROM 'https://github.com/MulukenMegersa/data-Semantics-project/blob/main/phi3_embeddings_result_1000.csv'
+AS row
+MATCH (m:Movie {movieId: row.movieId})
+CALL db.create.setNodeVectorProperty(m, 'plotEmbedding', apoc.convert.fromJsonList(row.embedding))
+RETURN count(*)
